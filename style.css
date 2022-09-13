@@ -1,0 +1,57 @@
+body {
+  font-family: sans-serif;
+  padding: 2rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.row.odd {
+  margin-left: 3rem;
+}
+
+.row.even {
+}
+
+/*
+:root {
+  --magic: 1.1547;
+  --squareWidth: 48;
+  --apothem: calc(var(--squareWidth)/2);
+  --hex-side: calc(var(--magic) * var(--apothem));
+  --rest: calc(var(--squareWidth) - var(--hex-side));
+  --firstPoint: calc(var(--rest)/2);
+  --secondPoint: calc(var(--firstPoint) + var(--hex-side)); 
+  --a: calc(var(--firstPoint) * 1px);
+  --b: calc(var(--secondPoint) * 1px);
+}
+*/
+
+
+
+
+.note {
+  background-color: palegoldenrod;
+  border: 2px solid black;
+  font-size: 1.25rem;
+  clip-path: polygon(0 var(--a), 0 var(--b), var(--a) 100%, var(--b) 100%, 100% var(--b), 100% var(--a), var(--b) 0, var(--a) 0);
+
+  width: 3rem;
+  height: 3rem;
+  margin: 1.5rem;
+  /*border-radius: 3rem;*/
+  transition: all 0.1s;
+}
+
+.note:active,
+.note:focus {
+  background-color: black;
+  color: white;
+  outline: none;
+  transform: scale(1.1);
+}
+
+.note:hover {
+  transform: scale(1.2);
+}
