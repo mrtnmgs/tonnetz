@@ -6,3 +6,7 @@ body {
 * {
   box-sizing: border-box;
 }
+
+.note {
+  font: 1.2em system-ui;
+}
