@@ -15,7 +15,10 @@
   </head>
 
   <body>
-    <div class="table"></div>
+      <svg id="s" version="1.1"
+        width="450" height="750"
+        xmlns="http://www.w3.org/2000/svg">
+      </svg>
   </body>
   <script>
     const notes = [
@@ -38,37 +41,75 @@
       return notes[pitch % 12];
     }
 
-    const table = document.querySelector(".table");
+    /* the horizontal axis has a 'linear' progression, going up in semitones
+    * hence we build the lattice per row
+    * rows are built bottom to top since we're going up in the musical scale
+    * the first note of the next row (above is a third up, alternatively minor and major
+    * visually it is offset to the right (major) or to the left (minor)
+    */
 
-    // the horizontal axis has a 'linear' progression, going up in semitones
-    // hence we build the lattice per row
-    // rows are built bottom to top since we're going up in the musical scale
-    // the first note of the next row (above is a third up, alternatively minor and major
-    // visually it is offset to the right (major) or to the left (minor)
+    function hexPoints(x, y, radius) {
+      const points = [];
+      for (let theta = 0; theta < Math.PI * 2; theta += Math.PI / 3) {
+        let pointX, pointY;
 
-    let initialPitch = 21; // A0 for the first row
-    initialPitch = 22;
+        pointX = x + radius * Math.sin(theta);
+        pointY = y + radius * Math.cos(theta);
 
+        points.push(pointX + ',' + pointY);
+      }
+
+      return points.join(' ');
+    }
+
+    let x, y, row, col, pointX, pointY, theta;
+
+    const radius = 50;
+    const svg = document.getElementById('s');
+    svg.setAttribute("width", radius * 2 * 7);
+    svg.setAttribute("height", radius * 2 * 15);
+
+    let basePitch = 22; // A#0 for the first row
+
+    // SINGLE NOTES
     // create the rows
     // start at 1 bc used as multiplier
-    for (let row = 1; row < 16; row++) {
-      const rowEl = document.createElement("div");
-      rowEl.classList.add("row", row % 2 ? "odd" : "even");
-
-      // create the notes
-      for (let note = 0; note < 7; note++) {
-        const midiPitch = initialPitch + note;
+    let rowNotePitch = basePitch;
+    const noteRadius = radius * 2/3;
+    for (row = 1; row < 16; row ++) {
+      const rowEl = document.createElementNS("http://www.w3.org/2000/svg", "g")
+      rowEl.classList.add("note-row");
+      for (col = 0; col < 7; col ++) {
+        const midiPitch = rowNotePitch + col;
         const noteName = midiToNote(midiPitch).toUpperCase();
         const noteNameOct = noteName + Math.floor(midiPitch / 12 - 1);
-        const noteEl = document.createElement("button");
-        noteEl.classList.add("note");
-        noteEl.setAttribute("data-midi", midiPitch);
-        noteEl.textContent = noteName;
-        noteEl.addEventListener("click",() => play(noteNameOct));
-        rowEl.append(noteEl);
+        const offset = (Math.sqrt(3) * radius) / 2;
+        x = 40 + offset * col * 2;
+        y = (radius * 2 * 15) - (40 + offset * row * Math.sqrt(3));
+
+        if (row % 2 !== 0) x += offset;
+
+        const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        group.classList.add("tile");
+        group.addEventListener("click",() => play(noteNameOct));
+        const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+        polygon.style.fill = 'transparent';
+        polygon.style.stroke = 'black';
+        polygon.style.strokeWidth = '4px';
+        polygon.setAttribute('points', hexPoints(x, y, noteRadius));
+        polygon.setAttribute("data-midi", midiPitch);
+        polygon.setAttribute("tabindex", "0");
+
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.textContent = noteName;
+        text.setAttribute("x", x - 10);
+        text.setAttribute("y", y + 5);
+        group.appendChild(text);
+        group.appendChild(polygon);
+        rowEl.appendChild(group);
       }
-      table.prepend(rowEl);
-      initialPitch += row % 2 ? 3 : 4; // next row goes up a third (alt min and major)
+      svg.appendChild(rowEl);
+      rowNotePitch += row % 2 ? 3 : 4; // next row goes up a third (alt min and major)
     }
 
     const monosynth = new Tone.PolySynth(Tone.MonoSynth, {
@@ -106,18 +147,5 @@
 
       poly.triggerAttackRelease(notes, "8n");
     }
-
-    const magic = 1.1547;
-    const squareWidth = 100;
-    const apothem = squareWidth / 2;
-    const hexSide = magic * apothem;
-    const rest = squareWidth - hexSide;
-    const firstPoint = rest / 2;
-    const secondPoint = firstPoint + hexSide;
-
-    console.log(hexSide, rest, firstPoint, secondPoint);
-
-    document.documentElement.style.setProperty('--a', firstPoint + "%"); 
-    document.documentElement.style.setProperty('--b', secondPoint + "%"); 
   </script>
 </html>
