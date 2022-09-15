@@ -1,3 +1,8 @@
+// todo
+// keyboard movement TYHBVF or note names
+// inputs for the options 
+// straighten out the grid
+
 // DATA
 function fillMatrix() {
   const minMidiPitch = 22;
@@ -46,21 +51,27 @@ const noteNames = [
   "B",
 ];
 
+function getPitch(x, y) {
+  return matrix[y][x];
+}
+
 function midiToNote(pitch) {
   // midi pitch to note name. C3 = MIDI 48 = "C"
   return noteNames[pitch % 12];
 }
 
-function midiToNotesOct(pitches) {
-  // same as above with octave number (format the synth wants)
-  return pitches.map(
-    (pitch) => noteNames[pitch % 12] + Math.floor(pitch / 12 - 1)
-  );
+function midiToNoteOct(pitch) {
+  return noteNames[pitch % 12] + Math.floor(pitch / 12 - 1);
+}
+
+function coordsToNoteOct(x, y) {
+  const pitch = getPitch(x, y);
+  return midiToNoteOct(pitch);
 }
 
 // GEOMETRY
 function hexPoints(x, y, radius) {
-  const tileRadius = radius; //(radius * 2) / 3;
+  const tileRadius = (radius * 6) / 7;
   const points = [];
   for (let theta = 0; theta < Math.PI * 2; theta += Math.PI / 3) {
     let pointX, pointY;
@@ -89,7 +100,7 @@ function createTile(x, y) {
   let posx = 40 + offset * col * 2;
   const posy = radius * 2 * numCols - (40 + offset * row * Math.sqrt(3));
 
-  const p = matrix[x][y];
+  const p = getPitch(x, y);
   const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
   group.classList.add("tile");
 
@@ -113,11 +124,10 @@ function createTile(x, y) {
 function createText(posx, posy, p) {
   const noteName = midiToNote(p);
   const textEl = document.createElementNS("http://www.w3.org/2000/svg", "text");
-  const text = noteName + p;
+  textEl.classList.add("note-name");
+  const text = noteName;
   textEl.textContent = text;
-  // const xOffset = 10 - text.length * 2;
-  // textEl.setAttribute("x", posx - xOffset);
-  textEl.setAttribute("x", posx - 25);
+  textEl.setAttribute("x", posx - 10);
   textEl.setAttribute("y", posy + 5);
   return textEl;
 }
@@ -140,7 +150,7 @@ for (row = 0; row < matrix.length; row++) {
   // row = y axis
   const rowEl = createRow(row);
   for (col = 0; col < matrix[row].length; col++) {
-    const tileEl = createTile(row, col);
+    const tileEl = createTile(col, row);
     rowEl.appendChild(tileEl);
   }
   svg.appendChild(rowEl);
@@ -148,66 +158,82 @@ for (row = 0; row < matrix.length; row++) {
 
 function handleClick(polygonEl, x, y) {
   colorTile(polygonEl, "#FFDDDDBB");
-  //const note = midiToNotesOct([matrix[x][y]]);
+  //const note = coordsToNoteOct(x,y);
   //play(note);
   // play takes noteOct as input, but playChord takes an x and a y
-  playChord(x, y);
+  mode === "note" ? play(coordsToNoteOct(x, y)) : playChord(x, y);
 }
 function getElFromCoords(coords) {
   return document.querySelector(`[data-matrix="${coords}"]`);
 }
 
 // AUDIO
-const tempo = 60;
+const tempo = 120;
+let mode = "note"; // note || chord
 
 function bpmToMs(bpm) {
-  return 60000 / bpm
+  return 60000 / bpm;
 }
 
-function playChord(x, y) {
+function playChord(x, y, arp = false) {
+  const notes = [];
   const tonicEl = getElFromCoords([x, y]);
-  colorTile(tonicEl, "#FFBBDDDD");
-  // find the element based on its relation in the matrix
-  // min third is above, maj is below;
-  const [thirdX, thirdY] = Math.round(Math.random())
-    ? [x, y + 1]
-    : [x + 1, y - 1]; // randomly min or maj
-  const thirdEl = getElFromCoords([thirdX, thirdY]);
-  thirdEl && colorTile(thirdEl, "#BBDDFFDD");
-  const [fifthX, fifthY] = [x + 1, y];
-  const fifthEl = getElFromCoords([fifthX, fifthY]);
-  fifthEl && colorTile(fifthEl, "#BBFFDDDD");
+  if (tonicEl) {
+    colorTile(tonicEl, "#FFBBDDDD");
+    notes.push(coordsToNoteOct(x, y));
+    // find the element based on its relation in the matrix
+    // min third is above, maj is below;
+    const [thirdX, thirdY] = Math.round(Math.random())
+      ? [x, y + 1]
+      : [x + 1, y - 1]; // randomly min or maj
+    const thirdEl = getElFromCoords([thirdX, thirdY]);
+    if (thirdEl) {
+      colorTile(thirdEl, "#BBDDFFDD");
+      notes.push(coordsToNoteOct(thirdX, thirdY));
+    }
 
-  let notez = midiToNotesOct([
-    matrix[x][y],
-    matrix[thirdX][thirdY],
-    matrix[fifthX][fifthY],
-  ]);
+    const [fifthX, fifthY] = [x + 1, y];
+    const fifthEl = getElFromCoords([fifthX, fifthY]);
+    if (fifthEl) {
+      colorTile(fifthEl, "#BBFFDDDD");
+      notes.push(coordsToNoteOct(fifthX, fifthY));
+    }
 
-  // play(notez);
-  arpeggiate(notez);
-}
+    // add octave
+    notes.push(midiToNoteOct(getPitch(x, y) + 12));
 
-function playLater(note, time) {
-  setTimeout(() => play(note), time);
+    // play twice
+    notes.push(...notes);
+
+    arp ? arpeggiate(notes) : play(notes);
+  }
 }
 
 // takes array of NoteOct as input
 function arpeggiate(chord) {
-  const beat = bpmToMs(tempo) / chord.length;
-  chord.forEach((note, i) => playLater(note, beat * (i + 1) - beat));
+  const beat = (bpmToMs(tempo) * 4) / chord.length;
+  chord.forEach((note, i) => {
+    const delay = beat * (i + 1) - beat;
+    setTimeout(() => play(note), delay);
+  });
 }
 
-const monosynth = new Tone.PolySynth(Tone.MonoSynth, {
+function play(notes) {
+  if (Tone.context.state !== "running") {
+    Tone.context.resume();
+  }
+
+  /*
+{
   volume: -8,
   oscillator: {
-    type: "square8",
+    type: "triangle8",
   },
   envelope: {
-    attack: 0.05,
+    attack: 0.01,
     decay: 0.8,
-    sustain: 0.4,
-    release: 0.5,
+    sustain: 0.1,
+    release: 0.1,
   },
   filterEnvelope: {
     attack: 0.001,
@@ -217,58 +243,122 @@ const monosynth = new Tone.PolySynth(Tone.MonoSynth, {
     baseFrequency: 300,
     octaves: 4,
   },
-});
+}
+*/
 
-function play(notes) {
-  if (Tone.context.state !== "running") {
-    Tone.context.resume();
-  }
-
-  const poly = new Tone.PolySynth(Tone.Synth, {
-    oscillator: {
-      partials: [0, 2, 3, 4, 5, 8],
-    },
-  }).toDestination();
-
-  poly.triggerAttackRelease(notes, "2n");
+  mono.triggerAttackRelease(notes, "8n");
+  poly.triggerAttackRelease(notes, "8n");
 }
 
+const mono = new Tone.PolySynth(Tone.MonoSynth, {
+  volume: -20,
+  oscillator: {
+    type: "square8",
+  },
+  envelope: {
+    attack: 0.01,
+    decay: 0.3,
+    sustain: 0.4,
+    release: 0.8,
+  },
+  filterEnvelope: {
+    attack: 0.001,
+    decay: 0.7,
+    sustain: 0.1,
+    release: 0.8,
+    baseFrequency: 300,
+    octaves: 4,
+  },
+}).toDestination();
+
+const poly = new Tone.PolySynth(Tone.Synth, {
+  volume: -24,
+  oscillator: {
+    type: "sine3",
+  },
+}).toDestination();
+
 function walker(x, y) {
-  w = setInterval(() => {
+  playChord(x, y, true);
+  return setInterval(() => {
     const dir = Math.floor(Math.random() * 7);
     switch (dir) {
       case 0:
         x += 1;
+        break;
       case 1:
         x += 1;
         y -= 1;
+        break;
       case 2:
         y -= 1;
+        break;
       case 3:
         x -= 1;
+        break;
       case 4:
         x -= 1;
         y += 1;
+        break;
       case 5:
         y += 1;
+        break;
     }
-    if (!!matrix[x][y]) {
-      playChord(x, y);
-    } else {
-      w.clearInterval();
-    }
-  }, bpmToMs(tempo) * 3);
+    playChord(x, y, true);
+  }, bpmToMs(tempo) * 4); // 1 bar in 4/4
 }
 
-let w;
+let pointer = 0;
+function pattern(x, y) {
+  playChord(x, y, true);
+  return setInterval(() => {
+    const dirs = [2, 3, 5, 1]; // down, left, up, down+right
+    // const dirs = [3, 5, 0, 2]; // left, up, right, down (loop)
+    const dir = dirs[pointer];
+    switch (dir) {
+      case 0:
+        x += 1;
+        break;
+      case 1:
+        x += 1;
+        y -= 1;
+        break;
+      case 2:
+        y -= 1;
+        break;
+      case 3:
+        x -= 1;
+        break;
+      case 4:
+        x -= 1;
+        y += 1;
+        break;
+      case 5:
+        y += 1;
+        break;
+    }
+    playChord(x, y, true);
+    pointer = (pointer + 1) % dirs.length;
+  }, bpmToMs(tempo) * 4); // 1 bar in 4/4
+}
+
+let seqs = [];
 document.addEventListener("keydown", (ev) => {
   switch (ev.key) {
     case "1":
-      w = walker(4, 3);
+      const x = Math.floor(Math.random() * 3) + 1;
+      const y = Math.floor(Math.random() * 4) + 1;
+      seqs.push(walker(x, y));
       break;
     case "2":
-      console.log(w);
-      w.clearInterval();
+      seqs.push(pattern(2, 8));
+      break;
+    case "3":
+      mode = mode === "note" ? "chord" : "note";
+      break;
+    case "0":
+      const seq = seqs.pop();
+      clearInterval(seq);
       break;
   }
 });
